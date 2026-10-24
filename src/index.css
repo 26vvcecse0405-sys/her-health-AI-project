@@ -116,25 +116,26 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.03em; }
 .btn.danger { color: #fff1f2; background: linear-gradient(135deg, #e11d48, #fb7185); }
 .topbar { position: relative; z-index: 30; min-width: 0; max-width: 100%; }
 .header-actions {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
+  display: flex;
   align-items: center;
-  justify-content: end;
-  gap: 0.75rem 1rem;
+  justify-content: space-between;
+  gap: 1rem;
   width: max-content;
   max-width: 100%;
   margin-left: auto;
+  padding-top: 1.15rem;
 }
 .lang-control {
   position: relative;
   display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 0.3rem;
+  flex: 1 1 auto;
   min-width: 12.5rem;
+  max-width: 100%;
 }
 .lang-control-label {
+  position: absolute;
+  inset-inline-start: 0.15rem;
+  bottom: calc(100% + 0.35rem);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -230,9 +231,10 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.03em; }
 }
 .header-emergency:hover { filter: brightness(1.08); }
 .header-emergency:focus-visible { outline-color: #fda4af; }
-@media (max-width: 440px) {
-  .header-actions { grid-auto-flow: row; grid-template-columns: 1fr; width: 100%; }
-  .lang-control, .header-emergency { width: 100%; min-width: 0; }
+@media (max-width: 640px) {
+  .header-actions { gap: 0.5rem; }
+  .lang-control { min-width: 0; }
+  .header-emergency { padding-inline: 0.7rem; }
 }
 .btn.quiet { color: var(--color-muted); background: transparent; padding-inline: 0.7rem; }
 
