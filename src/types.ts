@@ -149,7 +149,9 @@ export type DosePlan = {
   time: string
   period: DosePeriod
   notes: string
-  repeat: 'daily'
+  repeat: 'daily' | 'weekly'
+  /** Weekdays for a weekly plan, 0 = Sunday. Daily plans ignore this. */
+  weekdays?: number[]
   createdAt: string
   sample: boolean
 }
@@ -159,10 +161,13 @@ export type DoseLog = {
   id: string
   planId: string
   name: string
-  status: 'taken' | 'missed' | 'skipped'
+  status: 'taken' | 'missed' | 'skipped' | 'snoozed'
   note: string
   createdAt: string
   sample: boolean
+  /** One calendar occurrence, for example `dose-folic:2026-10-24`. */
+  occurrenceId?: string
+  snoozeUntil?: string
 }
 
 export type Reminder = {
@@ -259,4 +264,5 @@ export type AssistantAnswer = {
   source: AnswerSource
   detail: Copy
   links: { href: string; label: Copy }[]
+  topicId?: string
 }

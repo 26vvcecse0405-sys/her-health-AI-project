@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Bell, BookOpen, FileHeart, HeartPulse, Hospital, MessageCircle, Pill, Receipt, ScanLine, Settings as SettingsIcon, Shield, Siren, Sparkles, Stethoscope, Wifi, WifiOff } from 'lucide-react'
 import { useHealth } from '../context/HealthContext'
 import { chrome, t } from '../i18n'
+import { DoseCompanion } from './DoseCompanion'
 import { LanguageSelect } from './LanguageSelect'
 import { Modal } from './ui'
 import { SakhiMark } from './SakhiMark'
@@ -76,10 +77,13 @@ export function Shell() {
           </div>
           <div className="header-actions">
             <LanguageSelect lang={lang} label={t(lang, chrome.language)} onChange={(next) => void health.setLanguage(next)} />
-            <button type="button" className="btn danger header-emergency" onClick={() => setEmergency(true)}>
-              <Siren size={16} aria-hidden="true" />
-              {t(lang, chrome.emergency)}
-            </button>
+            <div className="header-tools">
+              <DoseCompanion />
+              <button type="button" className="btn danger header-emergency" onClick={() => setEmergency(true)}>
+                <Siren size={16} aria-hidden="true" />
+                {t(lang, chrome.emergency)}
+              </button>
+            </div>
           </div>
         </header>
         {simulated ? (

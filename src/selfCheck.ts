@@ -1,3 +1,6 @@
+import { answerQuestion } from './services/assistant'
+import { inQuietHours, localDateKey, occurrenceId, occurrenceState, todaysOccurrences } from './services/doseSchedule'
+import type { DoseLog, DosePlan } from './types'
 import { SAMPLE_BILL, SAMPLE_PACKAGE, SAMPLE_PRESCRIPTION, SAMPLE_REPORT, compareMedicines, extractMedicines, parseReport, reviewBill } from './services/documents'
 import { buildPassport } from './services/passport'
 import { concernFor, rankHospitals, routeEta } from './services/rank'
@@ -76,5 +79,71 @@ const passport = buildPassport({
 })
 assert(passport.includes('kept') && !passport.includes('sample note'), 'passport respects the sample switch')
 assert(routeEta({ id: 'x', label: 'x', km: 1, baseMin: 10, sensitivity: 0 }, 'heavy') === 10, 'zero sensitivity ignores traffic')
+
+const banned = /No saved answer matched|health topics saved on this device|I cannot diagnose or prescribe|Nothing was invented as medical advice/i
+const symptomQuestions = [
+  ['I have irregular periods. What should I do?', /Understanding your concern/, /PCOS|thyroid/i, /When did your last period/],
+  ['I have severe period cramps. What can help?', /cramp/i, /ibuprofen|paracetamol/i, /warm/i],
+  ['What are the symptoms of PCOS?', /PCOS/, /acne|hair growth/i, /you have PCOS/i],
+  ['I have unusual vaginal discharge. What could be the reason?', /discharge/i, /thrush|bacterial/i],
+  ['What can I do if I think I have anemia?', /blood count|hemoglobin/i, /iron/i],
+  ['What should I know before taking medicine for period pain?', /pharmacist/i, /ibuprofen/i],
+  ['I am bleeding heavily and feeling faint.', /urgent care now/i, /112/],
+] as const
+
+const symptomAnswers: string[] = []
+for (const [question, ...patterns] of symptomQuestions) {
+  const answer = await answerQuestion({ message: question, lang: 'en', consent: false, offline: true })
+  symptomAnswers.push(answer.text)
+  assert(!banned.test(answer.text), `banned phrase in ${question}`)
+  assert(!replyLooksUnsafe(answer.text), `unsafe reply for ${question}`)
+  assert(!/\b\d+\s*mg\b/i.test(answer.text), `dose number in ${question}`)
+  for (const pattern of patterns) {
+    const negative = pattern.source.startsWith('you have PCOS')
+    assert(negative ? !pattern.test(answer.text) : pattern.test(answer.text), `${question} :: ${pattern}`)
+  }
+}
+assert(new Set(symptomAnswers).size === symptomQuestions.length, 'symptom answers must differ')
+assert(!/urgent care now/i.test(symptomAnswers[0]), 'irregular periods should not open as an emergency')
+const follow = await answerQuestion({
+  message: 'They used to be regular and this started recently.',
+  lang: 'en',
+  consent: false,
+  offline: true,
+  history: [{ role: 'sakhi', text: symptomAnswers[0], topicId: 'irregular-periods' }],
+})
+assert(/new for you/i.test(follow.text), 'irregular follow-up')
+assert(!banned.test(follow.text), 'follow-up keeps a useful reply')
+
+const plan: DosePlan = {
+  kind: 'dose',
+  id: 'dose-check',
+  name: 'Sample tablet',
+  time: '08:00',
+  period: 'morning',
+  notes: 'With food',
+  repeat: 'daily',
+  createdAt: '2026-10-24T00:00:00.000Z',
+  sample: true,
+}
+const morning = new Date(2026, 9, 24, 7, 30, 0)
+const later = new Date(2026, 9, 24, 9, 0, 0)
+const dayKey = localDateKey(later)
+assert(dayKey === '2026-10-24', `local date key ${dayKey}`)
+assert(occurrenceId(plan.id, dayKey) === 'dose-check:2026-10-24', 'stable occurrence id')
+assert(occurrenceState(plan, [], morning)?.state === 'upcoming', 'before the clock the dose is upcoming')
+assert(occurrenceState(plan, [], later)?.state === 'due', 'after the clock the dose is due')
+const takenLog: DoseLog = { kind: 'dose-log', id: 'log-1', planId: plan.id, name: plan.name, status: 'taken', note: '', occurrenceId: occurrenceId(plan.id, dayKey), createdAt: later.toISOString(), sample: false }
+assert(occurrenceState(plan, [takenLog], later)?.state === 'taken', 'a confirmation is the only taken state')
+assert(occurrenceState(plan, [takenLog, { ...takenLog, id: 'log-2' }], later)?.state === 'taken', 'a second taken log does not create another occurrence')
+const snoozeUntil = new Date(2026, 9, 24, 9, 10, 0).toISOString()
+const snoozed: DoseLog = { ...takenLog, id: 'log-s', status: 'snoozed', snoozeUntil }
+assert(occurrenceState(plan, [snoozed], later)?.state === 'snoozed', 'a future snooze is not due')
+assert(occurrenceState(plan, [snoozed], new Date(2026, 9, 24, 9, 11, 0))?.state === 'due', 'an expired snooze becomes due again')
+const weekly: DosePlan = { ...plan, id: 'dose-week', repeat: 'weekly', weekdays: [1] }
+assert(occurrenceState(weekly, [], later) === null, 'weekly plan stays off other weekdays')
+assert(todaysOccurrences([weekly], [], new Date(2026, 9, 26, 12, 0, 0)).length === 1, 'weekly plan runs on its weekday')
+assert(inQuietHours(new Date(2026, 9, 24, 23, 30), '22:00', '07:00') === true, 'quiet hours can cross midnight')
+assert(inQuietHours(new Date(2026, 9, 24, 12, 0), '', '') === false, 'empty quiet hours stay off')
 
 console.log('HerHealth self-check passed.')

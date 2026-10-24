@@ -1,112 +1,245 @@
-import { useState } from 'react'
-import { PageIntro, SafetyNote, Suggest } from '../components/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { Pill } from 'lucide-react'
+import { PageIntro, SafetyNote } from '../components/ui'
 import { useHealth } from '../context/HealthContext'
 import { t } from '../i18n'
+import { reminderCopy } from '../i18n/reminders'
+import { languageMeta } from '../languages'
 import { formatWhen } from '../lib/format'
+import { countdownTarget, formatCountdown, loadPrefs, savePrefs, todaysOccurrences, weekBars, type DoseOccurrence, type DoseState, type ReminderPrefs } from '../services/doseSchedule'
 import type { DosePeriod } from '../types'
 
 const periods: DosePeriod[] = ['morning', 'afternoon', 'evening', 'night']
 
+const periodCopy: Record<DosePeriod, { en: string; kn: string; hi: string; gu: string; mr: string; ta: string; te: string; bn: string; ml: string; pa: string; or: string; ur: string }> = {
+  morning: { en: 'morning', kn: 'ಬೆಳಗ್ಗೆ', hi: 'सुबह', gu: 'સવાર', mr: 'सकाळ', ta: 'காலை', te: 'ఉదయం', bn: 'সকাল', ml: 'രാവിലെ', pa: 'ਸਵੇਰ', or: 'ସକାଳ', ur: 'صبح' },
+  afternoon: { en: 'afternoon', kn: 'ಮಧ್ಯಾಹ್ನ', hi: 'दोपहर', gu: 'બપોર', mr: 'दुपार', ta: 'மதியம்', te: 'మధ్యాహ్నం', bn: 'দুপুর', ml: 'ഉച്ച', pa: 'ਦੁਪਹਿਰ', or: 'ଅପରାହ୍ନ', ur: 'دوپہر' },
+  evening: { en: 'evening', kn: 'ಸಂಜೆ', hi: 'शाम', gu: 'સાંજ', mr: 'संध्याकाळ', ta: 'மாலை', te: 'సాయంత్రం', bn: 'সন্ধ্যা', ml: 'വൈകുന്നേരം', pa: 'ਸ਼ਾਮ', or: 'ସନ୍ଧ୍ୟା', ur: 'شام' },
+  night: { en: 'night', kn: 'ರಾತ್ರಿ', hi: 'रात', gu: 'રાત', mr: 'रात्र', ta: 'இரவு', te: 'రాత్రి', bn: 'রাত', ml: 'രാത്രി', pa: 'ਰਾਤ', or: 'ରାତି', ur: 'رات' },
+}
+
+function stateLabel(state: DoseState) {
+  if (state === 'due') return reminderCopy.due
+  if (state === 'upcoming') return reminderCopy.upcoming
+  if (state === 'taken') return reminderCopy.taken
+  if (state === 'snoozed') return reminderCopy.snoozed
+  return reminderCopy.missed
+}
+
 export function Reminders() {
-  const { snapshot, addDose, logDose, notify } = useHealth()
+  const { snapshot, addDose, updateDose, deleteById, logDose, notify } = useHealth()
+  const [now, setNow] = useState(() => new Date())
   const [name, setName] = useState('')
   const [time, setTime] = useState('08:00')
   const [period, setPeriod] = useState<DosePeriod>('morning')
+  const [repeat, setRepeat] = useState<'daily' | 'weekly'>('daily')
+  const [weekdays, setWeekdays] = useState<number[]>([new Date().getDay()])
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
-  const [suggest, setSuggest] = useState(false)
-  const [due, setDue] = useState(false)
-  if (!snapshot) return null
-  const lang = snapshot.profile.language
-  const taken = snapshot.doseLogs.filter((row) => row.status === 'taken').length
-  const total = Math.max(snapshot.doses.length, 1)
-  const progress = Math.min(100, Math.round((taken / total) * 100))
+  const [prefs, setPrefs] = useState<ReminderPrefs>(() => loadPrefs())
+  const [successName, setSuccessName] = useState('')
 
-  async function notifyDemo() {
-    if (!('Notification' in window)) {
-      notify(t(lang, { en: 'This browser has no notification API. The in-app reminder below still works.', kn: 'ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಅಧಿಸೂಚನೆ ಇಲ್ಲ. ಕೆಳಗಿನ ಜ್ಞಾಪನೆ ಇನ್ನೂ ಕೆಲಸ ಮಾಡುತ್ತದೆ.' }), 'warn')
-      setDue(true)
-      return
-    }
-    const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
-    if (permission === 'granted') {
-      new Notification('HerHealth AI', { body: 'Sample reminder: fictional folic acid tablet. This does not change a prescription.' })
-    } else {
-      notify(t(lang, { en: 'Notification permission was not granted. The reminder still appears in the page.', kn: 'ಅಧಿಸೂಚನೆ ಅನುಮತಿ ಸಿಗಲಿಲ್ಲ. ಜ್ಞಾಪನೆ ಪುಟದಲ್ಲೇ ಕಾಣಿಸುತ್ತದೆ.' }), 'warn')
-    }
-    setDue(true)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const lang = snapshot?.profile.language ?? 'en'
+  const rows = useMemo(
+    () => (snapshot ? todaysOccurrences(snapshot.doses, snapshot.doseLogs, now) : []),
+    [snapshot, now],
+  )
+  const bars = useMemo(
+    () => (snapshot ? weekBars(snapshot.doses, snapshot.doseLogs, now) : []),
+    [snapshot, now],
+  )
+
+  if (!snapshot) return null
+  const locale = languageMeta(lang).locale
+  const taken = rows.filter((row) => row.state === 'taken').length
+  const progress = rows.length === 0 ? 0 : Math.round((taken / rows.length) * 100)
+  const next = rows.find((row) => row.state === 'due') ?? rows.find((row) => row.state === 'upcoming' || row.state === 'snoozed') ?? rows.find((row) => row.state === 'missed' || row.state === 'skipped') ?? rows.at(-1) ?? null
+  const morning = rows.filter((row) => row.plan.period === 'morning')
+  const weekTaken = bars.reduce((sum, bar) => sum + bar.taken, 0)
+  const weekScheduled = bars.reduce((sum, bar) => sum + bar.scheduled, 0)
+  const groups: DoseState[] = ['due', 'upcoming', 'snoozed', 'taken', 'missed']
+
+  function changePrefs(patch: Partial<ReminderPrefs>) {
+    const nextPrefs = { ...prefs, ...patch }
+    setPrefs(nextPrefs)
+    savePrefs(nextPrefs)
+    window.dispatchEvent(new Event('sakhi-reminder-prefs'))
+  }
+
+  async function respond(row: DoseOccurrence, status: 'taken' | 'missed' | 'snoozed', minutes = 10) {
+    const saved = await logDose({
+      planId: row.plan.id,
+      name: row.plan.name,
+      status,
+      note: '',
+      occurrenceId: row.occurrenceId,
+      snoozeUntil: status === 'snoozed' ? new Date(Date.now() + minutes * 60_000).toISOString() : undefined,
+    })
+    if (saved && status === 'taken') setSuccessName(row.plan.name)
   }
 
   return (
     <div className="grid gap-5">
-      <PageIntro kicker={t(lang, { en: 'Medicine reminders', kn: 'ಔಷಧಿ ಜ್ಞಾಪನೆಗಳು' })} title={t(lang, { en: 'Day and night check-in', kn: 'ಹಗಲು ಮತ್ತು ರಾತ್ರಿ ಚೆಕ್-ಇನ್' })} lede={t(lang, { en: 'Copy the timing from a clinician’s instruction. A reminder tracks what you log. It does not change the dose, and it will not tell you to take an extra dose after a miss.', kn: 'ವೈದ್ಯರ ಸೂಚನೆಯ ಸಮಯವನ್ನು ನಕಲಿಸಿ. ಜ್ಞಾಪನೆ ನೀವು ದಾಖಲಿಸಿದ್ದನ್ನು ಇಡುತ್ತದೆ. ಅದು ಡೋಸ್ ಬದಲಾಯಿಸುವುದಿಲ್ಲ ಮತ್ತು ತಪ್ಪಿದ ನಂತರ ಹೆಚ್ಚುವರಿ ಡೋಸ್ ಹೇಳುವುದಿಲ್ಲ.' })} />
+      <PageIntro kicker={t(lang, { en: 'Medicine reminders', kn: 'ಔಷಧಿ ಜ್ಞಾಪನೆಗಳು', hi: 'दवा रिमाइंडर', gu: 'દવા રિમાઇન્ડર', mr: 'औषध आठवणी', ta: 'மருந்து நினைவூட்டல்', te: 'మందు రిమైండర్లు', bn: 'ওষুধের রিমাইন্ডার', ml: 'മരുന്ന് ഓർമ്മപ്പെടുത്തൽ', pa: 'ਦਵਾਈ ਯਾਦ-ਦਹਾਨੀ', or: 'ଔଷଧ ସ୍ମାରକ', ur: 'دوا کی یاددہانی' })} title={`${t(lang, reminderCopy.greeting)} 💜`} lede={t(lang, reminderCopy.limit)} />
       <SafetyNote lang={lang} />
-      <section className="light-panel grid gap-4">
-        <p className="text-sm">{t(lang, { en: 'Browser notifications work only after you allow them, and only while this page can run. Closing the laptop can delay them. The list below is the reliable record.', kn: 'ಬ್ರೌಸರ್ ಅಧಿಸೂಚನೆ ನೀವು ಅನುಮತಿಸಿದ ನಂತರ ಮತ್ತು ಈ ಪುಟ ಚಾಲನೆಯಲ್ಲಿರುವಾಗ ಮಾತ್ರ. ಲ್ಯಾಪ್‌ಟಾಪ್ ಮುಚ್ಚಿದರೆ ಅವು ತಡವಾಗಬಹುದು. ಕೆಳಗಿನ ಪಟ್ಟಿ ನಂಬಬಹುದಾದ ದಾಖಲೆ.' })}</p>
+      <section className="dose-hero">
         <div>
-          <p className="text-sm font-semibold">{t(lang, { en: 'Logged doses', kn: 'ದಾಖಲಿಸಿದ ಡೋಸ್‌ಗಳು' })} {progress}%</p>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><div className="h-full bg-teal" style={{ width: `${progress}%` }} /></div>
+          <p className="dose-kicker"><Pill size={18} aria-hidden="true" /> {t(lang, reminderCopy.next)}</p>
+          {next ? (
+            <>
+              <h2 className="mt-2 text-3xl">{next.plan.name}</h2>
+              <p className="mt-1">{next.plan.time} · {t(lang, periodCopy[next.plan.period])} · {t(lang, stateLabel(next.state))}</p>
+              <p className="mt-2">{next.plan.notes || t(lang, reminderCopy.noInstructions)}</p>
+              <p className="dose-count" aria-live="polite">{next.state === 'upcoming' || next.state === 'snoozed' ? formatCountdown(countdownTarget(next).getTime() - now.getTime()) : t(lang, stateLabel(next.state))}</p>
+            </>
+          ) : <p className="mt-2">{t(lang, reminderCopy.none)}</p>}
         </div>
+        <div className="dose-ring" style={{ background: `conic-gradient(#5eead4 ${progress * 3.6}deg, rgba(255,255,255,0.12) 0)` }} role="img" aria-label={`${t(lang, reminderCopy.progress)} ${taken}/${rows.length}`}>
+          <span><strong>{taken}</strong><small>/{rows.length}</small></span>
+        </div>
+      </section>
+      <section className="glass p-4">
+        <h2 className="text-xl">{t(lang, reminderCopy.morning)}</h2>
+        {morning.length === 0 ? <p className="mt-2 text-muted">{t(lang, reminderCopy.none)}</p> : morning.map((row) => (
+          <p key={row.occurrenceId} className="mt-2">{row.plan.time} · {row.plan.name} · {t(lang, stateLabel(row.state))}</p>
+        ))}
+      </section>
+      <section className="glass p-4">
+        <h2 className="text-xl">{t(lang, reminderCopy.timeline)}</h2>
+        <div className="dose-timeline">
+          {rows.length === 0 ? <p className="text-muted">{t(lang, reminderCopy.none)}</p> : rows.map((row) => (
+            <div key={row.occurrenceId} className={`dose-slot slot-${row.state}`}>
+              <strong>{row.plan.time}</strong>
+              <span>{row.plan.name}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      {groups.map((state) => (
+        <section key={state} className="glass p-4">
+          <h2 className="text-xl">{t(lang, stateLabel(state))}</h2>
+          {rows.filter((row) => row.state === state || (state === 'missed' && row.state === 'skipped')).length === 0 ? <p className="mt-2 text-muted">{t(lang, reminderCopy.none)}</p> : rows.filter((row) => row.state === state || (state === 'missed' && row.state === 'skipped')).map((row) => (
+            <article key={row.occurrenceId} className="dose-card">
+              <div>
+                <h3>{row.plan.name}</h3>
+                <p className="text-sm text-muted">{row.plan.time} · {t(lang, periodCopy[row.plan.period])} · {row.plan.repeat === 'weekly' ? t(lang, reminderCopy.weekly) : t(lang, reminderCopy.daily)}</p>
+                <p className="mt-1 text-sm">{row.plan.notes || t(lang, reminderCopy.noInstructions)}</p>
+              </div>
+              {row.state === 'taken' ? <p className="text-sm">{t(lang, reminderCopy.already)}</p> : (
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn primary" onClick={() => void respond(row, 'taken')}>{t(lang, reminderCopy.taken)}</button>
+                  <button type="button" className="btn ghost" onClick={() => void respond(row, 'missed')}>{t(lang, reminderCopy.missed)}</button>
+                  {[5, 10, 15].map((minutes) => (
+                    <button key={minutes} type="button" className="chip" onClick={() => void respond(row, 'snoozed', minutes)}>{minutes} {t(lang, reminderCopy.minutes)}</button>
+                  ))}
+                </div>
+              )}
+              <button type="button" className="btn quiet w-fit" onClick={() => void deleteById(row.plan.id)}>{t(lang, reminderCopy.delete)}</button>
+              <label className="mt-2 grid max-w-xs gap-1 text-sm">
+                {t(lang, { en: 'Change time', kn: 'ಸಮಯ ಬದಲಿಸಿ', hi: 'समय बदलें', gu: 'સમય બદલો', mr: 'वेळ बदला', ta: 'நேரத்தை மாற்று', te: 'సమయం మార్చు', bn: 'সময় বদলান', ml: 'സമയം മാറ്റുക', pa: 'ਸਮਾਂ ਬਦਲੋ', or: 'ସମୟ ବଦଳାନ୍ତୁ', ur: 'وقت بدلیں' })}
+                <input className="field" type="time" value={row.plan.time} onChange={(event) => void updateDose(row.plan.id, { time: event.target.value })} />
+              </label>
+            </article>
+          ))}
+        </section>
+      ))}
+      <section className="glass p-4">
+        <h2 className="text-xl">{t(lang, reminderCopy.week)}</h2>
+        <p className="mt-1 text-sm text-muted">{t(lang, reminderCopy.summary)} · {weekTaken}/{weekScheduled}</p>
+        <div className="week-chart">
+          {bars.map((bar) => (
+            <div key={bar.key} className="week-col">
+              <div className="week-track" aria-hidden="true">
+                <div style={{ height: `${bar.scheduled === 0 ? 0 : Math.round((bar.taken / bar.scheduled) * 100)}%` }} />
+              </div>
+              <span>{new Intl.DateTimeFormat(locale, { weekday: 'narrow' }).format(bar.day)}</span>
+              <span className="sr-only">{bar.taken}/{bar.scheduled}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      {successName ? (
+        <div className="dose-success" role="status">
+          <p aria-hidden="true">🌸</p>
+          <h2>{t(lang, reminderCopy.successTitle)}</h2>
+          <p className="mt-2">{successName}. {t(lang, reminderCopy.successBody)}</p>
+          <button type="button" className="btn primary mt-3" onClick={() => setSuccessName('')}>{t(lang, reminderCopy.dismiss)}</button>
+        </div>
+      ) : null}
+      <section className="glass grid gap-3 p-4">
+        <h2 className="text-xl">{t(lang, reminderCopy.add)}</h2>
         <form className="grid gap-3" onSubmit={(event) => {
           event.preventDefault()
           if (name.trim().length < 2) {
-            setError(t(lang, { en: 'Enter the medicine name from the prescription, at least 2 characters.', kn: 'ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ನ ಔಷಧಿ ಹೆಸರನ್ನು ಕನಿಷ್ಠ 2 ಅಕ್ಷರದಲ್ಲಿ ಬರೆಯಿರಿ.' }))
+            setError(t(lang, { en: 'Enter the medicine name from your instructions, at least 2 characters.', kn: 'ಸೂಚನೆಯ ಔಷಧಿ ಹೆಸರನ್ನು ಕನಿಷ್ಠ 2 ಅಕ್ಷರದಲ್ಲಿ ಬರೆಯಿರಿ.', hi: 'निर्देश से दवा का नाम कम से कम 2 अक्षरों में लिखें।' }))
+            return
+          }
+          if (repeat === 'weekly' && weekdays.length === 0) {
+            setError(t(lang, { en: 'Choose at least one day for a weekly reminder.', kn: 'ವಾರದ ಜ್ಞಾಪನೆಗೆ ಕನಿಷ್ಠ ಒಂದು ದಿನವನ್ನು ಆಯ್ಕೆಮಾಡಿ.', hi: 'साप्ताहिक रिमाइंडर के लिए कम से कम एक दिन चुनें।' }))
             return
           }
           setError('')
-          void addDose({ name: name.trim(), time, period, notes: notes.trim() })
+          void addDose({ name: name.trim(), time, period, notes: notes.trim(), repeat, weekdays: repeat === 'weekly' ? weekdays : undefined })
           setName('')
           setNotes('')
         }}>
-          <label className="grid gap-1 text-sm font-semibold">{t(lang, { en: 'Medicine name', kn: 'ಔಷಧಿ ಹೆಸರು' })}<input className="field" value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label className="grid gap-1 text-sm font-semibold">{t(lang, { en: 'Medicine name', kn: 'ಔಷಧಿ ಹೆಸರು', hi: 'दवा का नाम', gu: 'દવાનું નામ', mr: 'औषधाचे नाव', ta: 'மருந்தின் பெயர்', te: 'మందు పేరు', bn: 'ওষুধের নাম', ml: 'മരുന്നിന്റെ പേര്', pa: 'ਦਵਾਈ ਦਾ ਨਾਮ', or: 'ଔଷଧ ନାମ', ur: 'دوا کا نام' })}<input className="field" value={name} onChange={(event) => setName(event.target.value)} /></label>
           <div className="flex flex-wrap gap-2">
             {periods.map((item) => (
-              <button key={item} type="button" className="chip" aria-pressed={period === item} onClick={() => setPeriod(item)}>{t(lang, { en: item, kn: item === 'morning' ? 'ಬೆಳಗ್ಗೆ' : item === 'afternoon' ? 'ಮಧ್ಯಾಹ್ನ' : item === 'evening' ? 'ಸಂಜೆ' : 'ರಾತ್ರಿ' })}</button>
+              <button key={item} type="button" className="chip" aria-pressed={period === item} onClick={() => setPeriod(item)}>{t(lang, periodCopy[item])}</button>
             ))}
           </div>
-          <label className="grid gap-1 text-sm font-semibold">{t(lang, { en: 'Reminder time', kn: 'ಜ್ಞಾಪನೆ ಸಮಯ' })}<input className="field max-w-xs" type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
-          <label className="grid gap-1 text-sm font-semibold">{t(lang, { en: 'Optional note', kn: 'ಐಚ್ಛಿಕ ಟಿಪ್ಪಣಿ' })}<input className="field" value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
-          {error ? <p className="text-sm text-rose-700" role="alert">{error}</p> : null}
-          <button className="btn primary w-fit" type="submit">{t(lang, { en: 'Save reminder', kn: 'ಜ್ಞಾಪನೆ ಉಳಿಸಿ' })}</button>
-        </form>
-        <button type="button" className="btn ghost w-fit" onClick={() => void notifyDemo()}>{t(lang, { en: 'Simulate a due reminder', kn: 'ಬಾಕಿ ಜ್ಞಾಪನೆಯನ್ನು ಅನುಕರಿಸಿ' })}</button>
-        {due ? (
-          <div className="rounded-2xl bg-white p-4">
-            <p className="font-semibold">{t(lang, { en: 'Sample reminder is due', kn: 'ಮಾದರಿ ಜ್ಞಾಪನೆ ಬಾಕಿ ಇದೆ' })}</p>
-            <p className="mt-1 text-sm">{snapshot.doses[0]?.name ?? t(lang, { en: 'Fictional folic acid tablet', kn: 'ಕಾಲ್ಪನಿಕ ಫೋಲಿಕ್ ಆಮ್ಲ ಮಾತ್ರೆ' })}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(['taken', 'missed', 'skipped'] as const).map((status) => (
-                <button key={status} type="button" className="btn ghost" onClick={() => {
-                  const plan = snapshot.doses[0]
-                  void logDose({ planId: plan?.id ?? 'demo', name: plan?.name ?? 'Sample reminder', status, note: '' })
-                  setDue(false)
-                  setSuggest(true)
-                }}>{t(lang, { en: status === 'taken' ? 'Taken' : status === 'missed' ? 'Not taken' : 'Skip / not applicable', kn: status === 'taken' ? 'ತೆಗೆದುಕೊಂಡೆ' : status === 'missed' ? 'ತೆಗೆದುಕೊಳ್ಳಲಿಲ್ಲ' : 'ಬಿಡಿ / ಅನ್ವಯಿಸುವುದಿಲ್ಲ' })}</button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="chip" aria-pressed={repeat === 'daily'} onClick={() => setRepeat('daily')}>{t(lang, reminderCopy.daily)}</button>
+            <button type="button" className="chip" aria-pressed={repeat === 'weekly'} onClick={() => setRepeat('weekly')}>{t(lang, reminderCopy.weekly)}</button>
           </div>
-        ) : null}
-        {suggest ? <Suggest title={t(lang, { en: 'Would you like to view your reminder history?', kn: 'ಜ್ಞಾಪನೆ ಇತಿಹಾಸ ನೋಡಬೇಕೇ?' })} action={t(lang, { en: 'It is on this page', kn: 'ಅದು ಈ ಪುಟದಲ್ಲಿದೆ' })} href="/reminders" dismiss={t(lang, { en: 'Dismiss', kn: 'ಮುಚ್ಚಿ' })} onDismiss={() => setSuggest(false)} /> : null}
-      </section>
-      <section className="glass p-5">
-        <h2 className="text-2xl">{t(lang, { en: 'Schedules', kn: 'ವೇಳಾಪಟ್ಟಿಗಳು' })}</h2>
-        {snapshot.doses.length === 0 ? <p className="mt-2 text-muted">{t(lang, { en: 'No reminders yet. Add one from a prescription you already have.', kn: 'ಇನ್ನೂ ಜ್ಞಾಪನೆ ಇಲ್ಲ. ನಿಮ್ಮ ಬಳಿ ಇರುವ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ನಿಂದ ಒಂದನ್ನು ಸೇರಿಸಿ.' })}</p> : snapshot.doses.map((dose) => (
-          <article key={dose.id} className="mt-3 border-t border-line pt-3">
-            <h3 className="text-lg">{dose.name}</h3>
-            <p className="text-sm text-muted">{dose.period} · {dose.time} · {dose.sample ? t(lang, { en: 'sample', kn: 'ಮಾದರಿ' }) : t(lang, { en: 'yours', kn: 'ನಿಮ್ಮದು' })}</p>
-            <p className="mt-1">{dose.notes}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(['taken', 'missed', 'skipped'] as const).map((status) => (
-                <button key={status} type="button" className="btn quiet" onClick={() => void logDose({ planId: dose.id, name: dose.name, status, note: '' })}>{t(lang, { en: status === 'taken' ? 'Taken' : status === 'missed' ? 'Not taken' : 'Skip', kn: status === 'taken' ? 'ತೆಗೆದುಕೊಂಡೆ' : status === 'missed' ? 'ತೆಗೆದುಕೊಳ್ಳಲಿಲ್ಲ' : 'ಬಿಡಿ' })}</button>
-              ))}
+          {repeat === 'weekly' ? (
+            <div className="flex flex-wrap gap-2">
+              {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+                const sample = new Date(2026, 5, 7 + day)
+                return (
+                  <button key={day} type="button" className="chip" aria-pressed={weekdays.includes(day)} onClick={() => setWeekdays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day])}>
+                    {new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(sample)}
+                  </button>
+                )
+              })}
             </div>
-          </article>
-        ))}
+          ) : null}
+          <label className="grid gap-1 text-sm font-semibold">{t(lang, { en: 'Reminder time', kn: 'ಜ್ಞಾಪನೆ ಸಮಯ', hi: 'रिमाइंडर समय', gu: 'રિમાઇન્ડર સમય', mr: 'आठवणीची वेळ', ta: 'நினைவூட்டல் நேரம்', te: 'రిమైండర్ సమయం', bn: 'রিমাইন্ডারের সময়', ml: 'ഓർമ്മപ്പെടുത്തൽ സമയം', pa: 'ਯਾਦ-ਦਹਾਨੀ ਸਮਾਂ', or: 'ସ୍ମାରକ ସମୟ', ur: 'یاددہانی کا وقت' })}<input className="field max-w-xs" type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
+          <label className="grid gap-1 text-sm font-semibold">{t(lang, { en: 'Instructions from your prescription', kn: 'ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಸೂಚನೆ', hi: 'प्रिस्क्रिप्शन के निर्देश', gu: 'પ્રિસ્ક્રિપ્શનની સૂચના', mr: 'प्रिस्क्रिप्शनची सूचना', ta: 'மருந்துச் சீட்டு அறிவுறுத்தல்', te: 'ప్రిస్క్రిప్షన్ సూచన', bn: 'প্রেসক্রিপশনের নির্দেশ', ml: 'കുറിപ്പടി നിർദ്ദേശം', pa: 'ਨੁਸਖ਼ੇ ਦੀ ਹਦਾਇਤ', or: 'ପ୍ରେସକ୍ରିପସନ୍ ନିର୍ଦ୍ଦେଶ', ur: 'نسخے کی ہدایت' })}<input className="field" value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+          {error ? <p className="text-sm text-rose-300" role="alert">{error}</p> : null}
+          <button className="btn primary w-fit" type="submit">{t(lang, { en: 'Save reminder', kn: 'ಜ್ಞಾಪನೆ ಉಳಿಸಿ', hi: 'रिमाइंडर सहेजें', gu: 'રિમાઇન્ડર સાચવો', mr: 'आठवण जतन करा', ta: 'நினைவூட்டலைச் சேமி', te: 'రిమైండర్ సేవ్ చేయి', bn: 'রিমাইন্ডার সেভ করুন', ml: 'ഓർമ്മപ്പെടുത്തൽ സേവ് ചെയ്യുക', pa: 'ਯਾਦ-ਦਹਾਨੀ ਸੰਭਾਲੋ', or: 'ସ୍ମାରକ ସଞ୍ଚୟ କରନ୍ତୁ', ur: 'یاددہانی محفوظ کریں' })}</button>
+        </form>
+        <button type="button" className="btn ghost w-fit" onClick={() => window.dispatchEvent(new Event('sakhi-demo-reminder'))}>{t(lang, reminderCopy.demo)}</button>
       </section>
-      <section className="glass p-5">
-        <h2 className="text-2xl">{t(lang, { en: 'History', kn: 'ಇತಿಹಾಸ' })}</h2>
-        {snapshot.doseLogs.length === 0 ? <p className="mt-2 text-muted">{t(lang, { en: 'No doses logged yet.', kn: 'ಇನ್ನೂ ಡೋಸ್ ದಾಖಲಾಗಿಲ್ಲ.' })}</p> : snapshot.doseLogs.map((row) => (
-          <p key={row.id} className="mt-2">{formatWhen(row.createdAt, lang)} · {row.name} · {row.status}</p>
+      <section className="glass grid gap-3 p-4">
+        <h2 className="text-xl">{t(lang, { en: 'Reminder preferences', kn: 'ಜ್ಞಾಪನೆ ಆಯ್ಕೆಗಳು', hi: 'रिमाइंडर विकल्प', gu: 'રિમાઇન્ડર પસંદગી', mr: 'आठवण पर्याय', ta: 'நினைவூட்டல் விருப்பங்கள்', te: 'రిమైండర్ అభిరుచులు', bn: 'রিমাইন্ডার পছন্দ', ml: 'ഓർമ്മപ്പെടുത്തൽ മുൻഗണനകൾ', pa: 'ਯਾਦ-ਦਹਾਨੀ ਪਸੰਦ', or: 'ସ୍ମାରକ ପସନ୍ଦ', ur: 'یاددہانی کی ترجیحات' })}</h2>
+        <p className="text-sm text-muted">{t(lang, reminderCopy.limit)}</p>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={prefs.sound} onChange={(event) => changePrefs({ sound: event.target.checked })} /> {t(lang, reminderCopy.sound)}</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={prefs.systemDetails} onChange={(event) => changePrefs({ systemDetails: event.target.checked })} /> {t(lang, reminderCopy.system)}</label>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1 text-sm">{t(lang, reminderCopy.quiet)}<input className="field" type="time" value={prefs.quietStart} onChange={(event) => changePrefs({ quietStart: event.target.value })} /></label>
+          <label className="grid gap-1 text-sm"><span className="sr-only">{t(lang, reminderCopy.quiet)}</span><input className="field" type="time" value={prefs.quietEnd} onChange={(event) => changePrefs({ quietEnd: event.target.value })} /></label>
+        </div>
+        <button type="button" className="btn ghost w-fit" onClick={() => {
+          if (!('Notification' in window)) {
+            notify(t(lang, reminderCopy.denied), 'warn')
+            return
+          }
+          void Notification.requestPermission().then((permission) => {
+            if (permission !== 'granted') notify(t(lang, reminderCopy.denied), 'warn')
+          })
+        }}>{t(lang, reminderCopy.allow)}</button>
+      </section>
+      <section className="glass p-4">
+        <h2 className="text-xl">{t(lang, { en: 'History', kn: 'ಇತಿಹಾಸ', hi: 'इतिहास', gu: 'ઇતિહાસ', mr: 'इतिहास', ta: 'வரலாறு', te: 'చరిత్ర', bn: 'ইতিহাস', ml: 'ചരിത്രം', pa: 'ਇਤਿਹਾਸ', or: 'ଇତିହାସ', ur: 'تاریخ' })}</h2>
+        {snapshot.doseLogs.length === 0 ? <p className="mt-2 text-muted">{t(lang, reminderCopy.emptyAlert)}</p> : snapshot.doseLogs.map((row) => (
+          <p key={row.id} className="mt-2">{formatWhen(row.createdAt, lang)} · {row.name} · {t(lang, row.status === 'taken' ? reminderCopy.taken : row.status === 'snoozed' ? reminderCopy.snoozed : reminderCopy.missed)}</p>
         ))}
       </section>
     </div>

@@ -302,7 +302,13 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.03em; }
 .ask-fab { position: fixed; right: 1rem; bottom: 1rem; z-index: 35; display: inline-flex; align-items: center; gap: 0.45rem; }
 .sakhi-mark { background: radial-gradient(circle at 30% 30%, #f9a8d4, #7c6cf0 58%, #123055); box-shadow: 0 0 0 0 rgba(124, 108, 240, 0.35); animation: sakhi-glow 3.2s ease-in-out infinite; }
 .sakhi-hello { display: flex; gap: 0.9rem; align-items: flex-start; padding: 1rem; border-radius: 1.25rem; background: linear-gradient(135deg, rgba(249, 168, 212, 0.16), rgba(94, 234, 212, 0.08)); }
-.sakhi-bubble { border-radius: 1.25rem; background: linear-gradient(180deg, rgba(18, 32, 58, 0.92), rgba(18, 40, 62, 0.88)); border: 1px solid rgba(125, 211, 252, 0.25); }
+.sakhi-bubble { border-radius: 1.25rem; background: linear-gradient(180deg, rgba(18, 32, 58, 0.92), rgba(18, 40, 62, 0.88)); border: 1px solid rgba(125, 211, 252, 0.25); overflow-wrap: anywhere; }
+.sakhi-guide h3 { margin: 0.9rem 0 0.3rem; font-size: 0.98rem; font-weight: 700; color: var(--color-teal); }
+.sakhi-guide h3:first-child { margin-top: 0.35rem; }
+.sakhi-guide p, .sakhi-guide li { line-height: 1.65; }
+.sakhi-guide p { margin: 0.3rem 0 0; }
+.sakhi-guide ul { margin: 0.35rem 0 0; padding-inline-start: 1.15rem; }
+.sakhi-guide li + li { margin-top: 0.28rem; }
 @keyframes sakhi-glow { 50% { box-shadow: 0 0 0 8px rgba(124, 108, 240, 0); } }
 html[dir="rtl"] body { text-align: start; }
 html[lang="ur"] { --font-sans: "Noto Sans Arabic", "Segoe UI", sans-serif; --font-display: "Noto Sans Arabic", Georgia, serif; }
@@ -363,8 +369,39 @@ html[lang="ur"] { --font-sans: "Noto Sans Arabic", "Segoe UI", sans-serif; --fon
   .side-toggle { width: auto; margin-top: 0.45rem; }
 }
 
+.header-tools { display: flex; align-items: center; gap: 0.5rem; }
+.reminder-bell { position: relative; }
+.bell-btn { position: relative; min-height: 2.75rem; min-width: 2.75rem; padding-inline: 0.7rem; }
+.bell-count { position: absolute; top: 0.15rem; inset-inline-end: 0.15rem; min-width: 1.1rem; border-radius: 999px; background: #fb7185; color: #041018; font-size: 0.68rem; font-weight: 700; line-height: 1.1rem; text-align: center; }
+.bell-panel { position: absolute; z-index: 32; top: calc(100% + 0.45rem); inset-inline-end: 0; width: min(22rem, calc(100vw - 1.5rem)); max-height: 22rem; overflow: auto; padding: 0.85rem; border-radius: 1rem; background: #10192d; border: 1px solid rgba(216, 180, 254, 0.45); box-shadow: 0 18px 40px rgba(2, 6, 16, 0.45); }
+.bell-row { display: flex; gap: 0.55rem; align-items: flex-start; margin-top: 0.75rem; }
+.status-dot { width: 0.55rem; height: 0.55rem; margin-top: 0.35rem; border-radius: 999px; background: #fcd34d; flex: none; }
+.status-taken { background: #6ee7b7; }
+.status-missed, .status-skipped { background: #fda4af; }
+.status-snoozed { background: #d8b4fe; }
+.status-due { background: #fb923c; }
+.dose-hero { display: grid; gap: 1rem; align-items: center; padding: 1.1rem; border-radius: 1.4rem; background: linear-gradient(135deg, rgba(216, 180, 254, 0.2), rgba(94, 234, 212, 0.12) 55%, rgba(253, 186, 154, 0.14)); border: 1px solid rgba(216, 180, 254, 0.35); }
+@media (min-width: 720px) { .dose-hero { grid-template-columns: 1fr auto; } }
+.dose-kicker { display: inline-flex; align-items: center; gap: 0.4rem; color: #f9a8d4; font-weight: 700; }
+.dose-count { margin-top: 0.6rem; font-size: 2rem; font-variant-numeric: tabular-nums; color: #5eead4; }
+.dose-ring { width: 6.5rem; height: 6.5rem; border-radius: 999px; display: grid; place-items: center; }
+.dose-ring span { width: 4.6rem; height: 4.6rem; border-radius: 999px; display: grid; place-items: center; background: #10192d; }
+.dose-card { display: grid; gap: 0.7rem; margin-top: 0.8rem; padding: 0.9rem; border-radius: 1rem; background: rgba(255, 247, 237, 0.04); border: 1px solid rgba(125, 211, 252, 0.2); }
+.dose-timeline { display: flex; gap: 0.6rem; overflow-x: auto; padding-top: 0.7rem; }
+.dose-slot { min-width: 8.5rem; padding: 0.7rem; border-radius: 0.9rem; background: rgba(216, 180, 254, 0.12); }
+.slot-taken { background: rgba(110, 231, 183, 0.16); }
+.slot-due { background: rgba(251, 146, 60, 0.18); }
+.slot-missed, .slot-skipped { background: rgba(253, 164, 175, 0.12); }
+.week-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.45rem; align-items: end; margin-top: 0.8rem; }
+.week-col { display: grid; justify-items: center; gap: 0.3rem; font-size: 0.75rem; }
+.week-track { width: 100%; height: 6.5rem; border-radius: 999px; background: rgba(255,255,255,0.06); display: flex; align-items: end; overflow: hidden; }
+.week-track div { width: 100%; background: linear-gradient(#d8b4fe, #5eead4); border-radius: 999px; }
+.dose-alert-back { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; background: rgba(4, 10, 20, 0.62); }
+.dose-alert, .dose-success { width: min(32rem, 100%); padding: 1.15rem; border-radius: 1.3rem; background: linear-gradient(180deg, #1a1430, #122033); border: 1px solid rgba(249, 168, 212, 0.45); box-shadow: 0 24px 60px rgba(2, 6, 16, 0.45); animation: dose-rise 0.28s ease; }
+.dose-follow { position: fixed; z-index: 36; left: 1rem; right: 1rem; bottom: 5.5rem; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 1rem; background: #10192d; border: 1px solid rgba(94, 234, 212, 0.35); }
+@keyframes dose-rise { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .btn, .skeleton, .lang-select { animation: none; transition: none; }
+  .btn, .skeleton, .lang-select, .dose-alert, .dose-success { animation: none; transition: none; }
 }
 
 @media print {

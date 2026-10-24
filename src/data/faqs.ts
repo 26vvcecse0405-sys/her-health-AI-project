@@ -165,6 +165,6 @@ export function suggestLinks(message: string) {
 }
 
 export const defaultFaqBody: Copy = {
-  en: 'I can explain the health topics saved on this device, such as iron-rich foods, what to carry to a visit, or how the fictional hospital list works. I cannot diagnose or prescribe. If you feel very unwell, contact local emergency services.',
-  kn: 'ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಿದ ವಿಷಯಗಳನ್ನು ನಾನು ವಿವರಿಸಬಲ್ಲೆ — ಕಬ್ಬಿಣದ ಆಹಾರ, ಭೇಟಿಗೆ ಏನು ತೆಗೆದುಕೊಳ್ಳಬಹುದು, ಅಥವಾ ಕಾಲ್ಪನಿಕ ಆಸ್ಪತ್ರೆ ಪಟ್ಟಿ. ನಾನು ರೋಗ ನಿರ್ಣಯ ಮಾಡಲು ಅಥವಾ ಔಷಧಿ ಬರೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ. ತುಂಬಾ ಅಸ್ವಸ್ಥರಾಗಿದ್ದರೆ ಸ್ಥಳೀಯ ತುರ್ತು ಸೇವೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.',
+  en: 'I don’t have a saved note for that exact question, and no live model is connected, so I won’t guess a medical fact. Ask about periods, pain, discharge, pregnancy, menopause, breast changes, iron, mood, or a medicine, or take the question to a clinician or pharmacist.',
+  kn: 'ಆ ನಿಖರ ಪ್ರಶ್ನೆಗೆ ಉಳಿಸಿದ ಟಿಪ್ಪಣಿ ಇಲ್ಲ, ಮತ್ತು ನೇರ ಮಾದರಿ ಜೋಡಿಸಿಲ್ಲ, ಆದ್ದರಿಂದ ವೈದ್ಯಕೀಯ ಸಂಗತಿಯನ್ನು ಊಹಿಸುವುದಿಲ್ಲ. ಮುಟ್ಟು, ನೋವು, ಸ್ರಾವ, ಗರ್ಭ, ರಜೋನಿವೃತ್ತಿ, ಸ್ತನ ಬದಲಾವಣೆ, ಕಬ್ಬಿಣ, ಮನಸ್ಸು, ಅಥವಾ ಔಷಧದ ಬಗ್ಗೆ ಕೇಳಿ, ಅಥವಾ ಪ್ರಶ್ನೆಯನ್ನು ವೈದ್ಯರು ಅಥವಾ ಔಷಧಿಕಾರರ ಬಳಿ ತೆಗೆದುಕೊಳ್ಳಿ.',
 }

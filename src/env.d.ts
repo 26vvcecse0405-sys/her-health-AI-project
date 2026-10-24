@@ -19,6 +19,7 @@ interface SpeechRecCtor {
 interface Window {
   SpeechRecognition?: SpeechRecCtor
   webkitSpeechRecognition?: SpeechRecCtor
+  webkitAudioContext?: typeof AudioContext
 }
 
 interface ImportMetaEnv {

@@ -4,7 +4,8 @@ import { Mic, Volume2 } from 'lucide-react'
 import { SakhiMark } from '../components/SakhiMark'
 import { PageIntro, SafetyNote } from '../components/ui'
 import { useHealth } from '../context/HealthContext'
-import { FAQS } from '../data/faqs'
+import { matchFaq, FAQS } from '../data/faqs'
+import { guideSpeech, matchGuide } from '../data/guides'
 import { chrome, t } from '../i18n'
 import { sakhiError, sakhiThinking, sakhiWelcome } from '../i18n/sakhi'
 import { languageMeta } from '../languages'
@@ -20,6 +21,28 @@ function faqCopy(id: string): Copy {
   const faq = FAQS.find((item) => item.id === id)
   if (!faq) return { en: id }
   return faq.title
+}
+
+function GuideBody({ text }: { text: string }) {
+  if (!text.startsWith('# ') && !text.includes('\n# ')) return <p className="mt-1 leading-7 whitespace-pre-wrap">{text}</p>
+  const blocks = text.trim().split(/\n(?=# )/)
+  return (
+    <div className="sakhi-guide mt-1">
+      {blocks.map((block, index) => {
+        const lines = block.trim().split('\n').filter((line) => line.trim())
+        const heading = lines[0]?.replace(/^# /, '') ?? ''
+        const bullets = lines.slice(1).filter((line) => line.startsWith('- '))
+        const paragraphs = lines.slice(1).filter((line) => !line.startsWith('- '))
+        return (
+          <section key={`${heading}-${index}`}>
+            <h3>{heading}</h3>
+            {paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            {bullets.length > 0 ? <ul>{bullets.map((item) => <li key={item}>{item.slice(2)}</li>)}</ul> : null}
+          </section>
+        )
+      })}
+    </div>
+  )
 }
 
 const DOSE_LABEL: Copy = {
@@ -92,7 +115,8 @@ export function Assistant() {
         setRetry(null)
         return
       }
-      if (!textLooksUrgent(trimmed) && activeGuide) {
+      const leavesTiredScript = Boolean(matchGuide(trimmed) || matchFaq(trimmed))
+      if (!textLooksUrgent(trimmed) && activeGuide && !leavesTiredScript) {
         const wasReview = activeGuide.step === 'review'
         const next = advanceTiredGuide(activeGuide, trimmed, lang)
         if (wasReview && next.summary) {
@@ -103,6 +127,7 @@ export function Assistant() {
         setRetry(null)
         return
       }
+      if (leavesTiredScript) setGuide(null)
       if (!textLooksUrgent(trimmed)) {
         const started = startTiredGuide(trimmed)
         if (started) {
@@ -112,7 +137,8 @@ export function Assistant() {
           return
         }
       }
-      const answer = await answerQuestion({ message: trimmed, lang, consent, offline })
+      const history = turnsRef.current.slice(0, -1).slice(-8).map((turn) => ({ role: turn.role, text: turn.text, topicId: turn.answer?.topicId }))
+      const answer = await answerQuestion({ message: trimmed, lang, consent, offline, history })
       pushTurn({ role: 'sakhi', text: answer.text, answer })
       setRetry(null)
     } catch (error) {
@@ -147,12 +173,11 @@ export function Assistant() {
   }
 
   const sourceLabel = (answer: AssistantAnswer) => {
+    if (answer.source === 'curated' || answer.source === 'fallback') return t(lang, answer.detail)
     const map = {
       'urgent-rule': { en: 'Fixed urgent rule', kn: 'ನಿಗದಿತ ತುರ್ತು ನಿಯಮ' },
-      curated: { en: 'Curated on this device', kn: 'ಈ ಸಾಧನದ ಸಿದ್ಧ ಉತ್ತರ' },
       'local-model': { en: 'Local model', kn: 'ಸ್ಥಳೀಯ ಮಾದರಿ' },
       'online-model': { en: 'Online model', kn: 'ಆನ್‌ಲೈನ್ ಮಾದರಿ' },
-      fallback: { en: 'Saved fallback', kn: 'ಉಳಿಸಿದ ಪರ್ಯಾಯ' },
     } as const
     return `${t(lang, map[answer.source])}. ${t(lang, answer.detail)}`
   }
@@ -190,20 +215,20 @@ export function Assistant() {
           <p className="mt-2 text-sm text-muted">{t(lang, chrome.demoDraft)}</p>
         </div>
       </section>
-      <p className="mb-3 text-sm text-muted">{t(lang, { en: 'Follow-up questions about tiredness are a labelled script until you allow a configured model. SAKHI does not diagnose.', kn: 'ಆಯಾಸದ ಮುಂದಿನ ಪ್ರಶ್ನೆಗಳು ಲೇಬಲ್ ಮಾಡಿದ ಲಿಪಿ. ನೀವು ಮಾದರಿಗೆ ಅನುಮತಿಸುವವರೆಗೆ ಹಾಗೆಯೇ. SAKHI ರೋಗ ನಿರ್ಣಯ ಮಾಡುವುದಿಲ್ಲ.', hi: 'थकान के आगे के सवाल एक लेबल वाली स्क्रिप्ट हैं, जब तक आप मॉडल की अनुमति नहीं देते। SAKHI निदान नहीं करती।' })}</p>
+      <p className="mb-3 text-sm text-muted">{t(lang, { en: 'Symptom answers are saved educational notes. A live model is used only if you allow one in Privacy. Tiredness follow-ups stay on a short script.', kn: 'ಲಕ್ಷಣದ ಉತ್ತರಗಳು ಉಳಿಸಿದ ಶೈಕ್ಷಣಿಕ ಟಿಪ್ಪಣಿಗಳು. ನೀವು ಗೌಪ್ಯತೆಯಲ್ಲಿ ಅನುಮತಿಸಿದರೆ ಮಾತ್ರ ನೇರ ಮಾದರಿ ಬಳಕೆಯಾಗುತ್ತದೆ. ಆಯಾಸದ ಮುಂದಿನ ಪ್ರಶ್ನೆಗಳು ಚಿಕ್ಕ ಲಿಪಿಯಲ್ಲಿರುತ್ತವೆ.', hi: 'लक्षणों के जवाब सहेजे शैक्षिक नोट हैं। लाइव मॉडल तभी चलता है जब आप गोपनीयता में अनुमति दें। थकान के आगे के सवाल एक छोटी स्क्रिप्ट पर रहते हैं।' })}</p>
       <div className="grid gap-3">
         {turns.length === 0 ? <p className="text-muted">{t(lang, { en: 'Choose a starter or type a question.', kn: 'ಒಂದು ಪ್ರಾರಂಭ ಆಯ್ಕೆಮಾಡಿ ಅಥವಾ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಿ.' })}</p> : null}
         {turns.map((turn) => (
           <article key={turn.id} className={turn.role === 'sakhi' ? 'sakhi-bubble p-4' : 'glass p-4'}>
             <p className="text-sm text-muted">{turn.role === 'user' ? t(lang, { en: 'You', kn: 'ನೀವು', hi: 'आप', gu: 'તમે', mr: 'तुम्ही', ta: 'நீங்கள்', te: 'మీరు', bn: 'আপনি', ml: 'നിങ്ങൾ', pa: 'ਤੁਸੀਂ', or: 'ଆପଣ', ur: 'آپ' }) : 'SAKHI'}</p>
-            <p className="mt-1 leading-7">{turn.text}</p>
+            {turn.role === 'sakhi' ? <GuideBody text={turn.text} /> : <p className="mt-1 leading-7">{turn.text}</p>}
             {turn.answer ? (
               <>
                 <p className="mt-2 text-sm text-teal">{sourceLabel(turn.answer)}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {turn.answer.links.map((link) => <Link key={link.href} className="btn ghost" to={link.href}>{t(lang, link.label)}</Link>)}
-                  <button type="button" className="btn ghost" onClick={() => speak(turn.text)}><Volume2 size={16} /> {t(lang, { en: 'Read aloud', kn: 'ಓದಿ ಹೇಳಿ' })}</button>
-                  <button type="button" className="btn ghost" onClick={() => void addSymptom({ module: 'general', symptoms: ['sakhi-note'], severity: 0, notes: turn.text.slice(0, 500) })}>
+                  <button type="button" className="btn ghost" onClick={() => speak(guideSpeech(turn.text))}><Volume2 size={16} /> {t(lang, { en: 'Read aloud', kn: 'ಓದಿ ಹೇಳಿ' })}</button>
+                  <button type="button" className="btn ghost" onClick={() => void addSymptom({ module: 'general', symptoms: ['sakhi-note'], severity: 0, notes: guideSpeech(turn.text).slice(0, 500) })}>
                     {t(lang, { en: 'Save as a note', kn: 'ಟಿಪ್ಪಣಿಯಾಗಿ ಉಳಿಸಿ' })}
                   </button>
                 </div>

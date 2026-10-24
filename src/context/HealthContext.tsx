@@ -3,6 +3,7 @@ import { HOSPITALS } from '../data/hospitals'
 import { ARTICLES } from '../data/catalog'
 import { loadSnapshot, memorySnapshot, removeRecord, resetSnapshot, saveRecords, type Snapshot } from '../services/db'
 import { t } from '../i18n'
+import { reminderCopy } from '../i18n/reminders'
 import { doseLogged, doseMissed } from '../i18n/sakhi'
 import { isLang, languageMeta } from '../languages'
 import { showSymptoms, uid } from '../lib/format'
@@ -20,8 +21,9 @@ type HealthApi = {
   notify: (text: string, tone?: Notice['tone']) => void
   dismissNotice: (id: string) => void
   setLanguage: (language: Lang) => Promise<void>
-  addDose: (entry: { name: string; time: string; period: DosePeriod; notes: string }) => Promise<void>
-  logDose: (entry: { planId: string; name: string; status: DoseLog['status']; note: string }) => Promise<void>
+  addDose: (entry: { name: string; time: string; period: DosePeriod; notes: string; repeat?: DosePlan['repeat']; weekdays?: number[] }) => Promise<void>
+  updateDose: (id: string, patch: Partial<Pick<DosePlan, 'name' | 'time' | 'period' | 'notes' | 'repeat' | 'weekdays'>>) => Promise<void>
+  logDose: (entry: { planId: string; name: string; status: DoseLog['status']; note: string; occurrenceId?: string; snoozeUntil?: string }) => Promise<boolean>
   setLifeStage: (lifeStage: LifeStage) => Promise<void>
   setInterests: (interests: string[]) => Promise<void>
   setLocation: (locationId: OriginId) => Promise<void>
@@ -47,6 +49,7 @@ export function HealthProvider({ children }: { children: ReactNode }) {
   const [notices, setNotices] = useState<Notice[]>([])
   const snapRef = useRef<Snapshot | null>(null)
   const persistentRef = useRef(true)
+  const takenLock = useRef(new Set<string>())
   useEffect(() => {
     snapRef.current = snapshot
     persistentRef.current = persistent
@@ -138,16 +141,36 @@ export function HealthProvider({ children }: { children: ReactNode }) {
       dismissNotice: (id) => setNotices((current) => current.filter((item) => item.id !== id)),
       setLanguage: (language) => patchProfile({ language, languageChosen: true }),
       addDose: async (entry) => {
-        const row: DosePlan = { kind: 'dose', id: uid('dose'), createdAt: new Date().toISOString(), sample: false, repeat: 'daily', ...entry }
+        const row: DosePlan = { kind: 'dose', id: uid('dose'), createdAt: new Date().toISOString(), sample: false, repeat: entry.repeat ?? 'daily', name: entry.name, time: entry.time, period: entry.period, notes: entry.notes, weekdays: entry.weekdays }
         if (persistentRef.current) await saveRecords([row])
         setSnapshot((state) => (state ? { ...state, doses: [row, ...state.doses] } : state))
         notify(phrase('Reminder saved on this device. It does not change a prescription.', 'ಜ್ಞಾಪನೆ ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿದಿದೆ. ಇದು ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಬದಲಾಯಿಸುವುದಿಲ್ಲ.'))
       },
+      updateDose: async (id, patch) => {
+        const current = snapRef.current
+        const existing = current?.doses.find((item) => item.id === id)
+        if (!existing) return
+        const row: DosePlan = { ...existing, ...patch }
+        if (persistentRef.current) await saveRecords([row])
+        setSnapshot((state) => (state ? { ...state, doses: state.doses.map((item) => (item.id === id ? row : item)) } : state))
+      },
       logDose: async (entry) => {
+        const current = snapRef.current
+        const lang = current?.profile.language ?? 'en'
+        const already = entry.occurrenceId
+          ? current?.doseLogs.some((log) => log.occurrenceId === entry.occurrenceId && log.status === 'taken') || takenLock.current.has(entry.occurrenceId)
+          : false
+        if (already) {
+          notify(t(lang, reminderCopy.already), 'warn')
+          return false
+        }
+        if (entry.status === 'taken' && entry.occurrenceId) takenLock.current.add(entry.occurrenceId)
         const row: DoseLog = { kind: 'dose-log', id: uid('log'), createdAt: new Date().toISOString(), sample: false, ...entry }
         if (persistentRef.current) await saveRecords([row])
         setSnapshot((state) => (state ? { ...state, doseLogs: [row, ...state.doseLogs] } : state))
-        notify(t(snapRef.current?.profile.language ?? 'en', entry.status === 'taken' ? doseLogged : doseMissed))
+        const message = entry.status === 'taken' ? doseLogged : entry.status === 'snoozed' ? reminderCopy.snoozed : doseMissed
+        notify(t(lang, message), entry.status === 'taken' ? 'good' : 'warn')
+        return true
       },
       setLifeStage: (lifeStage) => patchProfile({ lifeStage }),
       setInterests: (interests) => patchProfile({ interests }),

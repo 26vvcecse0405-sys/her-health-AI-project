@@ -1,8 +1,11 @@
 import { matchFaq, suggestLinks } from '../data/faqs'
+import { GUIDES, continueGuide, isBleedingEmergency, matchGuide, renderGuide } from '../data/guides'
 import { t } from '../i18n'
 import { emptyQuestion, fallbackAnswer } from '../i18n/sakhi'
 import { asksForDiagnosis, asksForDose, diagnosisAnswer, doseAnswer, replyLooksUnsafe, textLooksUrgent, urgentAnswer } from './triage'
 import type { AssistantAnswer, Lang } from '../types'
+
+export type AnswerHistory = { role: 'user' | 'sakhi'; text: string; topicId?: string }
 
 export type ModelStatus = {
   reachable: boolean
@@ -21,7 +24,24 @@ export async function modelStatus(): Promise<ModelStatus> {
   }
 }
 
-export async function answerQuestion(input: { message: string; lang: Lang; consent: boolean; offline: boolean }): Promise<AssistantAnswer> {
+const savedDetail = {
+  en: 'Saved educational guidance on this device. A live AI model was not called.',
+  kn: 'ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಿದ ಶೈಕ್ಷಣಿಕ ಮಾರ್ಗದರ್ಶನ. ನೇರ AI ಮಾದರಿಗೆ ಕರೆ ಮಾಡಿಲ್ಲ.',
+}
+
+function guideAnswer(topic: { id: string; href: string; link: { en: string; kn?: string }; text: string }, message: string): AssistantAnswer {
+  const links = [{ href: topic.href, label: topic.link }, ...suggestLinks(message)]
+    .filter((link, index, all) => all.findIndex((item) => item.href === link.href) === index)
+  return {
+    source: 'curated',
+    text: topic.text,
+    topicId: topic.id,
+    detail: savedDetail,
+    links: links.slice(0, 3),
+  }
+}
+
+export async function answerQuestion(input: { message: string; lang: Lang; consent: boolean; offline: boolean; history?: AnswerHistory[] }): Promise<AssistantAnswer> {
   const message = input.message.trim()
   if (!message) {
     return {
@@ -31,26 +51,37 @@ export async function answerQuestion(input: { message: string; lang: Lang; conse
       links: [],
     }
   }
-  if (textLooksUrgent(message)) return urgentAnswer(input.lang)
   if (asksForDose(message)) return doseAnswer(input.lang)
+  if (isBleedingEmergency(message)) {
+    const urgentBleed = matchGuide(message)
+    if (urgentBleed) return guideAnswer({ ...urgentBleed, text: renderGuide(urgentBleed) }, message)
+  }
+  if (textLooksUrgent(message)) return urgentAnswer(input.lang)
+
+  const guide = matchGuide(message)
+  if (guide) return guideAnswer({ ...guide, text: renderGuide(guide) }, message)
   if (asksForDiagnosis(message)) return diagnosisAnswer(input.lang)
 
   const faq = matchFaq(message)
   const links = (faq ? [{ href: faq.href, label: faq.link }, ...suggestLinks(message)] : suggestLinks(message))
     .filter((link, index, all) => all.findIndex((item) => item.href === link.href) === index)
-  const curated = faq
-    ? {
-        source: 'curated' as const,
-        text: t(input.lang, faq.body),
-        detail: input.offline
-          ? { en: 'Curated answer stored on this device. No model was contacted.', kn: 'ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಿದ ಸಿದ್ಧ ಉತ್ತರ. ಯಾವ ಮಾದರಿಯನ್ನೂ ಸಂಪರ್ಕಿಸಿಲ್ಲ.' }
-          : input.consent
-            ? { en: 'Curated answer. A configured model was not used for this reply.', kn: 'ಸಿದ್ಧ ಉತ್ತರ. ಈ ಉತ್ತರಕ್ಕೆ ಮಾದರಿಯನ್ನು ಬಳಸಿಲ್ಲ.' }
-            : { en: 'Curated answer. Online models stay off until you allow them in Privacy.', kn: 'ಸಿದ್ಧ ಉತ್ತರ. ಗೌಪ್ಯತೆಯಲ್ಲಿ ಅನುಮತಿಸುವವರೆಗೆ ಆನ್‌ಲೈನ್ ಮಾದರಿಗಳು ಆಫ್ ಆಗಿರುತ್ತವೆ.' },
-        links: links.slice(0, 3),
-      }
-    : null
-  if (curated) return curated
+  if (faq) {
+    return {
+      source: 'curated',
+      text: t(input.lang, faq.body),
+      detail: savedDetail,
+      links: links.slice(0, 3),
+    }
+  }
+
+  const previous = [...(input.history ?? [])].reverse().find((turn) => turn.role === 'sakhi' && turn.topicId)
+  const followUp = /\b(recent(?:ly)?|always|ago|weeks?|days?|months?|yesterday|started|yes|no|sometimes|regular|pregnant|first time|since|never|used to|not really)\b/i
+  const looksLikeFollowUp = message.length < 240 && (followUp.test(message) || (message.length < 48 && !message.includes('?')))
+  if (previous?.topicId && looksLikeFollowUp) {
+    const topic = GUIDES.find((item) => item.id === previous.topicId)
+    const continued = topic ? continueGuide(topic.id, message) : null
+    if (topic && continued) return guideAnswer({ ...topic, text: continued }, message)
+  }
 
   if (!input.offline && input.consent) {
     try {
@@ -85,8 +116,8 @@ export async function answerQuestion(input: { message: string; lang: Lang; conse
     source: 'fallback',
     text: t(input.lang, fallbackAnswer),
     detail: {
-      en: 'No saved answer matched. Nothing was invented as medical advice.',
-      kn: 'ಉಳಿಸಿದ ಉತ್ತರ ಹೊಂದಿಕೆಯಾಗಲಿಲ್ಲ. ವೈದ್ಯಕೀಯ ಸಲಹೆಯನ್ನು ಕಲ್ಪಿಸಿಲ್ಲ.',
+      en: 'This question is outside the saved notes. A live AI model was not called.',
+      kn: 'ಈ ಪ್ರಶ್ನೆ ಉಳಿಸಿದ ಟಿಪ್ಪಣಿಗಳ ಹೊರಗಿದೆ. ನೇರ AI ಮಾದರಿಗೆ ಕರೆ ಮಾಡಿಲ್ಲ.',
     },
     links: [
       { href: '/health', label: { en: 'Browse women’s health topics', kn: 'ಮಹಿಳಾ ಆರೋಗ್ಯ ವಿಷಯಗಳನ್ನು ನೋಡಿ' } },
