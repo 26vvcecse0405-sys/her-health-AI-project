@@ -24,7 +24,7 @@ export function noticeFor(choice: SymptomChoice): Copy {
 
 const URGENT = /heavy bleeding|soaking through|cannot breathe|can't breathe|trouble breathing|chest pain|seizure|fainted|fainting|black stool|not moving|suicidal|kill myself|hurt myself|end my life|ರಕ್ತಸ್ರಾವ|ಉಸಿರಾಟ|ಎದೆ ನೋವು|ಮೂರ್ಛೆ|ಆತ್ಮಹತ್ಯೆ/i
 
-const DOSE = /how (many|much).{0,40}(iron|tablet|supplement|dose)|iron.{0,30}(dose|tablet|mg|supplement)|prescrib(e|ing)|ಡೋಸ್|ಎಷ್ಟು ಮಾತ್ರೆ|ಕಬ್ಬಿಣದ ಮಾತ್ರೆ|लोह|खुराक|લોખંડ|இரும்பு|ఇనుప|লোহার|ഇരുമ്പ്|ਲੋਹੇ|ଲୌହ|لوہے|خوراک/i
+const DOSE = /how (many|much).{0,40}(iron|tablet|supplement|dose)|iron.{0,30}(dose|tablet|mg|supplement)|prescrib(e|ing)|ask for a dose|dose \(refused\)|ಡೋಸ್|ಎಷ್ಟು ಮಾತ್ರೆ|ಕಬ್ಬಿಣದ ಮಾತ್ರೆ|लोह|खुराक|લોખંડ|માત્રા|मात्रा|இரும்பு|அளவு|ఇనుప|మోతాదు|লোহার|ডোজ|ഇരുമ്പ്|ഡോസ്|ਲੋਹੇ|ਖੁਰਾਕ|ଲୌହ|ଡୋଜ୍|لوہے|خوراک/i
 
 const DIAGNOSIS = /do i have|have i got|am i anemic|am i anaemic|is this (anemia|anaemia|endometriosis|cancer)|diagnose me|ನನಗೆ .{0,24}ಇದೆಯೇ|ರೋಗ ನಿರ್ಣಯ/i
 

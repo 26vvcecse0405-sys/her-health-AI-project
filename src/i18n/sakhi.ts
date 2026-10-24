@@ -16,8 +16,38 @@ export const sakhiWelcome: Copy = {
   ur: 'السلام، میں Sakhi ہوں 💗 آپ کی صحت کی ساتھی۔ آپ کی صحت سمجھنے، تندرستی درج کرنے، اور قابلِ اعتماد معلومات تلاش کرنے میں میں یہاں ہوں۔',
 }
 
+export const sakhiThinking: Copy = {
+  en: 'SAKHI is thinking…',
+  kn: 'SAKHI ಯೋಚಿಸುತ್ತಿದೆ…',
+  hi: 'SAKHI सोच रही है…',
+  gu: 'SAKHI વિચારી રહી છે…',
+  mr: 'SAKHI विचार करत आहे…',
+  ta: 'SAKHI யோசிக்கிறாள்…',
+  te: 'SAKHI ఆలోచిస్తోంది…',
+  bn: 'SAKHI ভাবছে…',
+  ml: 'SAKHI ആലോചിക്കുന്നു…',
+  pa: 'SAKHI ਸੋਚ ਰਹੀ ਹੈ…',
+  or: 'SAKHI ଭାବୁଛି…',
+  ur: 'SAKHI سوچ رہی ہے…',
+}
+
+export const sakhiError: Copy = {
+  en: 'SAKHI could not finish that reply. Nothing was saved. You can try again.',
+  kn: 'SAKHI ಆ ಉತ್ತರವನ್ನು ಮುಗಿಸಲಾಗಲಿಲ್ಲ. ಏನನ್ನೂ ಉಳಿಸಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಬಹುದು.',
+  hi: 'SAKHI वह जवाब पूरा नहीं कर पाई। कुछ सहेजा नहीं गया। फिर कोशिश कर सकते हैं।',
+  gu: 'SAKHI એ જવાબ પૂરો કરી શક્યું નહીં. કંઈ સચવાયું નથી. ફરી પ્રયત્ન કરી શકો.',
+  mr: 'SAKHI ते उत्तर पूर्ण करू शकली नाही. काही जतन झाले नाही. पुन्हा प्रयत्न करू शकता.',
+  ta: 'SAKHI அந்தப் பதிலை முடிக்க முடியவில்லை. எதுவும் சேமிக்கப்படவில்லை. மீண்டும் முயலலாம்.',
+  te: 'SAKHI ఆ సమాధానం పూర్తి చేయలేకపోయింది. ఏమీ సేవ్ కాలేదు. మళ్లీ ప్రయత్నించవచ్చు.',
+  bn: 'SAKHI সেই উত্তর শেষ করতে পারেনি। কিছু সেভ হয়নি। আবার চেষ্টা করতে পারেন।',
+  ml: 'SAKHI ആ മറുപടി പൂർത്തിയാക്കാനായില്ല. ഒന്നും സേവ് ആയില്ല. വീണ്ടും ശ്രമിക്കാം.',
+  pa: 'SAKHI ਉਹ ਜਵਾਬ ਪੂਰਾ ਨਹੀਂ ਕਰ ਸਕੀ। ਕੁਝ ਸੰਭਾਲਿਆ ਨਹੀਂ ਗਿਆ। ਫਿਰ ਕੋਸ਼ਿਸ਼ ਕਰ ਸਕਦੇ ਹੋ।',
+  or: 'SAKHI ସେହି ଉତ୍ତର ସମାପ୍ତ କରିପାରିଲା ନାହିଁ। କିଛି ସଞ୍ଚୟ ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିପାରିବେ।',
+  ur: 'SAKHI وہ جواب مکمل نہ کر سکی۔ کچھ محفوظ نہیں ہوا۔ دوبارہ کوشش کر سکتے ہیں۔',
+}
+
 export const tiredAsk: Copy = {
-  en: 'I’m sorry you’ve been feeling tired. How long has this been happening?',
+  en: 'I’m sorry you’ve been feeling tired. Tiredness has many possible causes, including sleep, stress, low iron, infection, thyroid changes, and pregnancy-related changes. This is not a diagnosis. If you have chest pain, fainting, trouble breathing, heavy bleeding, or thoughts of harming yourself, contact emergency services now. Otherwise, how long has this been happening?',
   kn: 'ಆಯಾಸದಿಂದ ನೀವು ತೊಂದರೆ ಪಡುತ್ತಿದ್ದೀರಿ ಎಂದು ಕೇಳಿ ನನಗೆ ಬೇಸರವಾಯಿತು. ಇದು ಎಷ್ಟು ದಿನಗಳಿಂದ ಇದೆ?',
   hi: 'थकान हो रही है, यह सुनकर अफ़सोस हुआ। यह कब से हो रहा है?',
   gu: 'થાક લાગે છે તે સાંભળીને દુઃખ થયું. આ ક્યારથી થઈ રહ્યું છે?',
@@ -156,8 +186,8 @@ export const emergencyText: Copy = {
 }
 
 export const doseText: Copy = {
-  en: 'I cannot give a dose, a tablet count, or a change to iron or any other medicine. General food information is not a prescription. People who are pregnant, or who think they may be low in iron, should ask a clinician or pharmacist before starting a supplement.',
-  kn: 'ನಾನು ಕಬ್ಬಿಣದ ಅಥವಾ ಇತರ ಔಷಧಿಯ ಡೋಸ್, ಮಾತ್ರೆ ಸಂಖ್ಯೆ, ಅಥವಾ ಬದಲಾವಣೆಯನ್ನು ಹೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆಹಾರದ ಬಗ್ಗೆ ಸಾಮಾನ್ಯ ಮಾಹಿತಿ ಔಷಧವಲ್ಲ. ಗರ್ಭಿಣಿಯರು ಮತ್ತು ಕಬ್ಬಿಣ ಕಡಿಮೆ ಇರಬಹುದು ಎಂದು ಭಾವಿಸುವವರು ಪೂರಕ ತೆಗೆದುಕೊಳ್ಳುವ ಮೊದಲು ವೈದ್ಯರು ಅಥವಾ ಔಷಧಿಕಾರರನ್ನು ಕೇಳಬೇಕು.',
+  en: 'I cannot give a dose, a tablet count, or a change to iron or any other medicine. Guessing a number is unsafe, because the right amount depends on tests, other medicines, and a person’s health. General food information is not a prescription. Ask a clinician or a pharmacist before starting a supplement.',
+  kn: 'ನಾನು ಕಬ್ಬಿಣದ ಅಥವಾ ಇತರ ಔಷಧಿಯ ಡೋಸ್, ಮಾತ್ರೆ ಸಂಖ್ಯೆ, ಅಥವಾ ಬದಲಾವಣೆಯನ್ನು ಹೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ಸಂಖ್ಯೆಯನ್ನು ಊಹಿಸುವುದು ಅಪಾಯಕಾರಿ, ಏಕೆಂದರೆ ಸರಿಯಾದ ಪ್ರಮಾಣ ಪರೀಕ್ಷೆ, ಇತರ ಔಷಧಿ ಮತ್ತು ವ್ಯಕ್ತಿಯ ಆರೋಗ್ಯವನ್ನು ಅವಲಂಬಿಸಿದೆ. ಆಹಾರದ ಬಗ್ಗೆ ಸಾಮಾನ್ಯ ಮಾಹಿತಿ ಔಷಧವಲ್ಲ. ಪೂರಕ ತೆಗೆದುಕೊಳ್ಳುವ ಮೊದಲು ವೈದ್ಯರು ಅಥವಾ ಔಷಧಿಕಾರರನ್ನು ಕೇಳಿ.',
   hi: 'मैं लोहे या किसी अन्य दवा की खुराक, गोली संख्या, या बदलाव नहीं बता सकती। सामान्य भोजन जानकारी नुस्खा नहीं है। गर्भवती लोग, या जिन्हें लोहे की कमी लगती हो, सप्लीमेंट शुरू करने से पहले चिकित्सक या फ़ार्मासिस्ट से पूछें।',
   gu: 'હું લોખંડ અથવા અન્ય દવાની માત્રા, ગોળીની સંખ્યા, અથવા ફેરફાર કહી શકતી નથી. સામાન્ય ખોરાક માહિતી પ્રિસ્ક્રિપ્શન નથી. ગર્ભવતી વ્યક્તિઓ, અથવા જેમને લોખંડ ઓછું લાગે, પૂરક શરૂ કરતા પહેલાં ડૉક્ટર અથવા ફાર્માસિસ્ટને પૂછો.',
   mr: 'मी लोह किंवा इतर औषधाची मात्रा, गोळ्यांची संख्या, किंवा बदल सांगू शकत नाही. सामान्य अन्न माहिती प्रिस्क्रिप्शन नाही. गर्भवती व्यक्ती, किंवा ज्यांना लोहाची कमतरता वाटते, पूरक सुरू करण्यापूर्वी चिकित्सक किंवा फार्मासिस्टला विचारा.',

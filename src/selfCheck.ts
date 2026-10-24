@@ -1,6 +1,7 @@
 import { SAMPLE_BILL, SAMPLE_PACKAGE, SAMPLE_PRESCRIPTION, SAMPLE_REPORT, compareMedicines, extractMedicines, parseReport, reviewBill } from './services/documents'
 import { buildPassport } from './services/passport'
 import { concernFor, rankHospitals, routeEta } from './services/rank'
+import { matchFaq } from './data/faqs'
 import { asksForDose, replyLooksUnsafe, textLooksUrgent } from './services/triage'
 
 function assert(condition: boolean, message: string) {
@@ -49,6 +50,14 @@ assert(!fields.some((field) => /you have anemia/i.test(field.note)), 'no anemia 
 assert(textLooksUrgent('I cannot breathe'), 'urgent text')
 assert(!textLooksUrgent('what should I carry to a visit'), 'ordinary question')
 assert(asksForDose('how many iron tablets should I take'), 'dose ask')
+assert(asksForDose('Ask for a dose (refused)'), 'dose chip label')
+assert(matchFaq('Help me understand women’s health.')?.id === 'womens-health', 'women’s health prompt')
+assert(matchFaq('Help me prepare for a health appointment.')?.id === 'appointment', 'appointment prompt')
+assert(matchFaq('Find a hospital with the service I need.')?.id === 'find-hospital', 'hospital prompt')
+assert(matchFaq('What is a primary health centre?')?.id === 'phc', 'phc prompt')
+assert(matchFaq('When is pelvic health screening required?')?.id === 'pelvic-screening', 'pelvic prompt')
+assert(matchFaq('When is period bleeding urgent?')?.id === 'period', 'period prompt')
+assert(matchFaq('What should I carry to a visit?')?.id === 'bag', 'visit bag prompt')
 assert(replyLooksUnsafe('You have anemia. Take 100 mg now.'), 'unsafe model text')
 assert(!replyLooksUnsafe('Tiredness has many causes. Ask a clinician.'), 'safe education')
 

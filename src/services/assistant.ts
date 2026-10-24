@@ -36,7 +36,21 @@ export async function answerQuestion(input: { message: string; lang: Lang; conse
   if (asksForDiagnosis(message)) return diagnosisAnswer(input.lang)
 
   const faq = matchFaq(message)
-  const links = faq ? [{ href: faq.href, label: faq.link }, ...suggestLinks(message)] : suggestLinks(message)
+  const links = (faq ? [{ href: faq.href, label: faq.link }, ...suggestLinks(message)] : suggestLinks(message))
+    .filter((link, index, all) => all.findIndex((item) => item.href === link.href) === index)
+  const curated = faq
+    ? {
+        source: 'curated' as const,
+        text: t(input.lang, faq.body),
+        detail: input.offline
+          ? { en: 'Curated answer stored on this device. No model was contacted.', kn: 'ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಿದ ಸಿದ್ಧ ಉತ್ತರ. ಯಾವ ಮಾದರಿಯನ್ನೂ ಸಂಪರ್ಕಿಸಿಲ್ಲ.' }
+          : input.consent
+            ? { en: 'Curated answer. A configured model was not used for this reply.', kn: 'ಸಿದ್ಧ ಉತ್ತರ. ಈ ಉತ್ತರಕ್ಕೆ ಮಾದರಿಯನ್ನು ಬಳಸಿಲ್ಲ.' }
+            : { en: 'Curated answer. Online models stay off until you allow them in Privacy.', kn: 'ಸಿದ್ಧ ಉತ್ತರ. ಗೌಪ್ಯತೆಯಲ್ಲಿ ಅನುಮತಿಸುವವರೆಗೆ ಆನ್‌ಲೈನ್ ಮಾದರಿಗಳು ಆಫ್ ಆಗಿರುತ್ತವೆ.' },
+        links: links.slice(0, 3),
+      }
+    : null
+  if (curated) return curated
 
   if (!input.offline && input.consent) {
     try {
@@ -62,21 +76,8 @@ export async function answerQuestion(input: { message: string; lang: Lang; conse
           links: links.slice(0, 3),
         }
       }
-    } catch {
-      // Fall through to the on-device FAQ. The user still gets a labeled answer.
-    }
-  }
-
-  if (faq) {
-    return {
-      source: 'curated',
-      text: t(input.lang, faq.body),
-      detail: input.offline
-        ? { en: 'Curated answer stored on this device. No model was contacted.', kn: 'ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಿದ ಸಿದ್ಧ ಉತ್ತರ. ಯಾವ ಮಾದರಿಯನ್ನೂ ಸಂಪರ್ಕಿಸಿಲ್ಲ.' }
-        : input.consent
-          ? { en: 'Curated answer. A configured model was not used for this reply.', kn: 'ಸಿದ್ಧ ಉತ್ತರ. ಈ ಉತ್ತರಕ್ಕೆ ಮಾದರಿಯನ್ನು ಬಳಸಿಲ್ಲ.' }
-          : { en: 'Curated answer. Online models stay off until you allow them in Privacy.', kn: 'ಸಿದ್ಧ ಉತ್ತರ. ಗೌಪ್ಯತೆಯಲ್ಲಿ ಅನುಮತಿಸುವವರೆಗೆ ಆನ್‌ಲೈನ್ ಮಾದರಿಗಳು ಆಫ್ ಆಗಿರುತ್ತವೆ.' },
-      links: links.slice(0, 3),
+    } catch (error) {
+      console.error('SAKHI model request failed', error instanceof Error ? error.name : 'Error')
     }
   }
 
